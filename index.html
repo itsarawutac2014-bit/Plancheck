@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>เช็คแผนผลิตกระดาษลูกฟูก (M1-M5 Inspector)</title>
+  <title>ระบบตรวจสอบและวิเคราะห์แผนผลิตกระดาษลูกฟูก</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,28 +21,32 @@
       border-color: #2563eb !important;
       background-color: #eff6ff !important;
     }
-    table td, table th {
+    .compact-table td, .compact-table th {
       padding: 3px 6px !important;
       line-height: 1.25;
     }
   </style>
 </head>
-<body class="min-h-screen pb-6 text-xs">
+<body class="min-h-screen pb-8 text-xs">
 
   <!-- Top Bar -->
   <div class="bg-slate-900 text-white shadow sticky top-0 z-30">
     <div class="max-w-6xl mx-auto px-3 py-2 flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <span class="w-6 h-6 rounded bg-rose-600 flex items-center justify-center font-extrabold text-xs">M</span>
-        <h1 class="text-sm font-bold">เช็คแผนผลิต: ตรวจจับกระดาษ M1-M5 ไม่ต่อกัน</h1>
+        <h1 class="text-sm font-bold">ระบบเช็คและวิเคราะห์แผนผลิตกระดาษลูกฟูก</h1>
       </div>
 
-      <!-- ปุ่มอัปโหลด / บันทึกรูป / ตัวตั้งค่า -->
+      <!-- ปุ่มหลัก -->
       <div class="flex items-center gap-1.5 flex-wrap">
-        <button id="btnToggleSettings" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 cursor-pointer transition font-bold text-xs shadow-sm">
-          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-amber-400"></i>
-          <span>ตั้งค่าเงื่อนไขการตรวจ</span>
-          <span id="settingsActiveDot" class="w-2 h-2 rounded-full bg-emerald-400 ml-0.5"></span>
+        <button id="btnLoadSample" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 cursor-pointer transition font-bold text-xs">
+          <i data-lucide="database" class="w-3.5 h-3.5"></i>
+          <span>โหลดแผนตัวอย่าง</span>
+        </button>
+
+        <button id="btnClearData" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition font-bold text-xs">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>ล้างข้อมูล</span>
         </button>
 
         <label for="fileInput" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white cursor-pointer transition font-bold text-xs shadow-sm">
@@ -64,161 +68,400 @@
     </div>
   </div>
 
-  <div class="max-w-6xl mx-auto px-3 mt-2.5 space-y-2">
+  <div class="max-w-6xl mx-auto px-3 mt-2.5 space-y-2.5">
 
-    <!-- แผงตั้งค่าเงื่อนไขขั้นสูง (พับ/กางได้ สำหรับการใช้งานในอนาคต) -->
-    <div id="settingsPanel" class="hidden bg-white border-2 border-amber-400/80 rounded-lg p-3 shadow-md space-y-2.5 transition-all">
-      <div class="flex items-center justify-between border-b border-slate-200 pb-1.5">
-        <div class="flex items-center gap-1.5 font-bold text-slate-800 text-xs sm:text-sm">
-          <i data-lucide="settings" class="w-4 h-4 text-amber-600"></i>
-          <span>ตั้งค่าเงื่อนไขการตรวจจับความผิดปกติ (Filter Rules Configuration)</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <button id="btnResetSettings" type="button" class="text-[11px] text-slate-500 hover:text-rose-600 underline cursor-pointer">
-            รีเซ็ตค่ามาตรฐาน (300 ม. / เช็ค M1-M5 ทุกชั้น)
-          </button>
-          <button id="btnCloseSettings" type="button" class="text-slate-400 hover:text-slate-700 text-sm font-bold px-1.5">✕</button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-        
-        <!-- เงื่อนไข 1: เกณฑ์ความยาวเมตร -->
-        <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
-          <label class="block font-bold text-slate-700">1. เกณฑ์ความยาวรวม (เมตร):</label>
-          <div class="flex items-center gap-1">
-            <span class="text-slate-500">น้อยกว่า (&lt;)</span>
-            <input id="cfgThreshold" type="number" value="300" min="10" max="5000" step="10" class="w-16 px-1.5 py-0.5 font-bold text-rose-600 border border-slate-300 rounded text-center bg-white" />
-            <span class="text-slate-500">ม.</span>
-          </div>
-          <p class="text-[10px] text-slate-400">ถ้าออเดอร์ยาวต่ำกว่านี้และเปลี่ยนโค้ดจะเตือน</p>
-        </div>
-
-        <!-- เงื่อนไข 2: เลือกชั้นกระดาษที่ต้องการเช็ค -->
-        <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
-          <label class="block font-bold text-slate-700">2. เลือกชั้นกระดาษที่ตรวจ:</label>
-          <div class="flex items-center gap-2 font-bold text-slate-800">
-            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM5" checked class="cfg-layer rounded text-rose-600" /> M5</label>
-            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM4" checked class="cfg-layer rounded text-rose-600" /> M4</label>
-            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM3" checked class="cfg-layer rounded text-rose-600" /> M3</label>
-            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM2" checked class="cfg-layer rounded text-rose-600" /> M2</label>
-            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM1" checked class="cfg-layer rounded text-rose-600" /> M1</label>
-          </div>
-          <p class="text-[10px] text-slate-400">ติ๊กเฉพาะชั้นที่สนใจ หรือตรวจครบทั้ง 5 ชั้น</p>
-        </div>
-
-        <!-- เงื่อนไข 3: เช็คการเปลี่ยนหน้ากว้างกระดาษ -->
-        <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
-          <label class="block font-bold text-slate-700">3. ตรวจการเปลี่ยนหน้ากว้าง:</label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
-            <input type="checkbox" id="chkWidthChange" checked class="rounded text-rose-600" />
-            <span>เตือนเมื่อเปลี่ยนหน้ากว้าง &lt; เกณฑ์</span>
-          </label>
-          <p class="text-[10px] text-slate-400">เช็คกรณีเปลี่ยนหน้ากว้างเดี่ยวๆ (เช่น 1690 มม.)</p>
-        </div>
-
-        <!-- เงื่อนไข 4: กรองเฉพาะลอน -->
-        <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
-          <label class="block font-bold text-slate-700">4. กรองเฉพาะลอนกระดาษ:</label>
-          <select id="cfgFluteFilter" class="w-full px-2 py-0.5 border border-slate-300 rounded font-semibold text-slate-700 bg-white">
-            <option value="ALL">ทุกลอน (BC, B, C, etc.)</option>
-            <option value="BC">เฉพาะลอน BC</option>
-            <option value="B">เฉพาะลอน B</option>
-            <option value="C">เฉพาะลอน C</option>
-          </select>
-          <p class="text-[10px] text-slate-400">เลือกดูเฉพาะไลน์ลอนที่กำลังขึ้นงานได้</p>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- แถบควบคุมขนาดกะทัดรัด (ช่องแคบลง) -->
+    <!-- แถบโยนไฟล์ & ตัวสลับหน้า (Tabs) -->
     <div class="bg-white rounded-lg p-2 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-2">
-      <!-- Drag & Drop เล็กๆ -->
-      <div id="dropZone" class="flex items-center gap-2 px-2.5 py-1 rounded border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 cursor-pointer transition">
-        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-blue-600"></i>
-        <span class="font-semibold text-slate-700">ลากไฟล์ Excel มาวางที่นี่</span>
-        <span id="fileStatusText" class="text-[11px] text-slate-400 border-l border-slate-200 pl-2">ตัวอย่าง: 10/11/69 PLAN 1 MC BHS</span>
+      <!-- Drag & Drop -->
+      <div id="dropZone" class="flex items-center gap-2 px-2.5 py-1.5 rounded border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 cursor-pointer transition">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-blue-600 shrink-0"></i>
+        <span class="font-bold text-slate-700">ลากไฟล์ Excel มาวางที่นี่</span>
+        <span id="fileStatusText" class="text-[11px] text-slate-500 border-l border-slate-200 pl-2">ยังไม่มีไฟล์ — กรุณาลากไฟล์แผนผลิตมาวาง</span>
       </div>
 
-      <!-- สลับโหมด & ปรับเมตรด่วน -->
-      <div class="flex items-center gap-2 flex-wrap">
-        <div class="inline-flex rounded bg-slate-100 p-0.5 border border-slate-200 text-xs font-bold">
-          <button type="button" data-mode="anomaly_with_context" class="mode-btn px-2.5 py-1 rounded bg-rose-600 text-white shadow-sm transition">
-            🚨 เฉพาะจุดผิดปกติ (เทียบหัว-ท้าย)
-          </button>
-          <button type="button" data-mode="anomaly_only" class="mode-btn px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition">
-            🎯 เฉพาะใบ &lt; <span class="th-val">300</span>ม.
-          </button>
-          <button type="button" data-mode="all" class="mode-btn px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition">
-            📋 ทั้งหมด (<span id="totalCountText">0</span>)
-          </button>
-        </div>
-
-        <div class="flex items-center bg-slate-100 rounded px-2 py-0.5 border border-slate-200 text-xs font-bold">
-          <span class="text-slate-600 mr-1">เกณฑ์: &lt;</span>
-          <input id="thresholdInput" type="number" value="300" min="10" max="5000" step="10" class="w-14 px-1 py-0.5 text-center font-extrabold text-rose-600 bg-white border border-slate-300 rounded" />
-          <span class="text-slate-600 ml-1">ม.</span>
-        </div>
+      <!-- ปุ่มเปลี่ยนหน้า: ตรวจเช็ค M1-M5 vs วิเคราะห์ออเดอร์ -->
+      <div class="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200 text-xs font-bold gap-1">
+        <button id="tabBtnCheck" type="button" data-tab="check" class="main-tab-btn px-3 py-1.5 rounded-md bg-slate-900 text-white shadow-sm transition flex items-center gap-1.5 cursor-pointer">
+          <span>🚨 เช็ค M1-M5 ไม่ต่อกัน</span>
+          <span id="tabBadgeAnomaly" class="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-black">0</span>
+        </button>
+        <button id="tabBtnAnalysis" type="button" data-tab="analysis" class="main-tab-btn px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer">
+          <span>📊 วิเคราะห์ออเดอร์ (สัดส่วน % แกรม & สั้น/กลาง/ยาว)</span>
+          <span id="tabBadgeTotal" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px] font-black">0</span>
+        </button>
       </div>
     </div>
 
-    <!-- แถบเลือกชีต -->
-    <div id="sheetBar" class="hidden bg-amber-50 border border-amber-200 rounded px-3 py-1 flex items-center gap-2 flex-wrap text-xs font-bold text-amber-900">
+    <!-- แถบเลือกชีต (แสดงเมื่อไฟล์มีหลายชีต) -->
+    <div id="sheetBar" class="hidden bg-amber-50 border border-amber-200 rounded px-3 py-1.5 flex items-center gap-2 flex-wrap text-xs font-bold text-amber-900">
       <span>ชีตแผน:</span>
       <div id="sheetButtons" class="flex items-center gap-1 flex-wrap"></div>
     </div>
 
     <!-- =================================================================== -->
-    <!-- พื้นที่แคปภาพ (ตารางกะทัดรัด ช่องเล็ก-แคบ อ่านเร็ว เรียงแนวยาว) -->
+    <!-- หน้า 1: เช็คออเดอร์ M1-M5 ไม่ต่อกัน (< 300 เมตร) -->
     <!-- =================================================================== -->
-    <div id="captureArea" class="bg-white rounded-lg border border-slate-300 shadow-sm overflow-hidden">
+    <div id="viewCheck" class="space-y-2">
 
-      <!-- หัวเรื่องแคปภาพ -->
-      <div class="bg-slate-900 text-white px-3 py-2 flex items-center justify-between gap-2 border-b border-slate-800">
+      <!-- แถบตัวกรองและปุ่มตั้งค่าของหน้าเช็ค M1-M5 -->
+      <div class="bg-white rounded-lg p-2 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-2">
+        <div class="inline-flex rounded bg-slate-100 p-0.5 border border-slate-200 text-xs font-bold">
+          <button type="button" data-mode="anomaly_with_context" class="mode-btn px-2.5 py-1 rounded bg-rose-600 text-white shadow-sm transition cursor-pointer">
+            🚨 เฉพาะจุดผิดปกติ (เทียบหัว-ท้าย)
+          </button>
+          <button type="button" data-mode="anomaly_only" class="mode-btn px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition cursor-pointer">
+            🎯 เฉพาะใบ &lt; <span class="th-val">300</span>ม.
+          </button>
+          <button type="button" data-mode="all" class="mode-btn px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition cursor-pointer">
+            📋 ทั้งหมด (<span id="totalCountText">0</span>)
+          </button>
+        </div>
+
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[11px] font-extrabold">สรุป</span>
-          <span id="planHeaderTitle" class="font-extrabold text-amber-300 text-xs sm:text-sm">วันที่ 10/11/69 PLAN 1 MC BHS</span>
-          <span id="activeRulesSummary" class="text-slate-300 text-[11px] hidden sm:inline bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-            เงื่อนไข: ตรวจ M5-M1 &lt; <span class="th-val">300</span> ม.
-          </span>
-        </div>
+          <div class="flex items-center bg-slate-100 rounded px-2 py-0.5 border border-slate-200 text-xs font-bold">
+            <span class="text-slate-600 mr-1">เกณฑ์: &lt;</span>
+            <input id="thresholdInput" type="number" value="300" min="10" max="5000" step="10" class="w-14 px-1 py-0.5 text-center font-extrabold text-rose-600 bg-white border border-slate-300 rounded" />
+            <span class="text-slate-600 ml-1">ม.</span>
+          </div>
 
-        <div class="flex items-center gap-2 text-xs">
-          <span class="text-slate-300">ผิดปกติ: <strong class="text-rose-400 text-sm font-black" id="anomalyCountBadge">0</strong> ใบ</span>
-          <span class="text-slate-500">/</span>
-          <span class="text-slate-400">ทั้งหมด: <strong class="text-white" id="allOrderCountBadge">0</strong></span>
+          <button id="btnToggleSettings" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer transition font-bold text-xs">
+            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>ตั้งค่าเงื่อนไขการตรวจ</span>
+          </button>
         </div>
       </div>
 
-      <!-- ตารางแบบช่องแคบ (Compact Width & Padding) -->
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-xs font-medium">
-          <thead>
-            <tr class="bg-slate-800 text-white text-[11px] font-bold border-b border-slate-700 select-none">
-              <th class="text-center w-10 border-r border-slate-700">ลำดับ</th>
-              <th class="w-32 border-r border-slate-700">PDR / ออเดอร์</th>
-              <th class="border-r border-slate-700">ชื่อลูกค้า</th>
-              <th class="text-center w-10 border-r border-slate-700">ลอน</th>
-              <th class="text-center w-16 border-r border-slate-700">หน้ากว้าง</th>
-              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M5 (หน้า)</th>
-              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M4 (ลอนB)</th>
-              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M3 (กลาง)</th>
-              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M2 (ลอนC)</th>
-              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M1 (หลัง)</th>
-              <th class="text-right w-20 bg-rose-950 text-amber-300 border-r border-slate-700">ยาวรวม (ม.)</th>
-              <th class="w-48 text-slate-200">สาเหตุ / ชั้นที่ไม่ต่อกัน</th>
-            </tr>
-          </thead>
-          <tbody id="planTableBody" class="divide-y divide-slate-200">
-            <!-- Render via JS -->
-          </tbody>
-        </table>
+      <!-- แผงตั้งค่าเงื่อนไขขั้นสูง -->
+      <div id="settingsPanel" class="hidden bg-white border-2 border-amber-400/80 rounded-lg p-3 shadow-md space-y-2.5 transition-all">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-1.5">
+          <div class="flex items-center gap-1.5 font-bold text-slate-800 text-xs sm:text-sm">
+            <i data-lucide="settings" class="w-4 h-4 text-amber-600"></i>
+            <span>ตั้งค่าเงื่อนไขการตรวจจับความผิดปกติ (Filter Rules Configuration)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnResetSettings" type="button" class="text-[11px] text-slate-500 hover:text-rose-600 underline cursor-pointer">
+              รีเซ็ตค่ามาตรฐาน (300 ม. / เช็ค M1-M5 ทุกชั้น)
+            </button>
+            <button id="btnCloseSettings" type="button" class="text-slate-400 hover:text-slate-700 text-sm font-bold px-1.5 cursor-pointer">✕</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
+            <label class="block font-bold text-slate-700">1. เกณฑ์ความยาวรวม (เมตร):</label>
+            <div class="flex items-center gap-1">
+              <span class="text-slate-500">น้อยกว่า (&lt;)</span>
+              <input id="cfgThreshold" type="number" value="300" min="10" max="5000" step="10" class="w-16 px-1.5 py-0.5 font-bold text-rose-600 border border-slate-300 rounded text-center bg-white" />
+              <span class="text-slate-500">ม.</span>
+            </div>
+            <p class="text-[10px] text-slate-400">ถ้าออเดอร์ยาวต่ำกว่านี้และเปลี่ยนโค้ดจะเตือน</p>
+          </div>
+
+          <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
+            <label class="block font-bold text-slate-700">2. เลือกชั้นกระดาษที่ตรวจ:</label>
+            <div class="flex items-center gap-2 font-bold text-slate-800">
+              <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM5" checked class="cfg-layer rounded text-rose-600" /> M5</label>
+              <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM4" checked class="cfg-layer rounded text-rose-600" /> M4</label>
+              <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM3" checked class="cfg-layer rounded text-rose-600" /> M3</label>
+              <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM2" checked class="cfg-layer rounded text-rose-600" /> M2</label>
+              <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM1" checked class="cfg-layer rounded text-rose-600" /> M1</label>
+            </div>
+            <p class="text-[10px] text-slate-400">ติ๊กเฉพาะชั้นที่สนใจ หรือตรวจครบทั้ง 5 ชั้น</p>
+          </div>
+
+          <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
+            <label class="block font-bold text-slate-700">3. ตรวจการเปลี่ยนหน้ากว้าง:</label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
+              <input type="checkbox" id="chkWidthChange" checked class="rounded text-rose-600" />
+              <span>เตือนเมื่อเปลี่ยนหน้ากว้าง &lt; เกณฑ์</span>
+            </label>
+            <p class="text-[10px] text-slate-400">เช็คกรณีเปลี่ยนหน้ากว้างเดี่ยวๆ (เช่น 1690 มม.)</p>
+          </div>
+
+          <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
+            <label class="block font-bold text-slate-700">4. กรองเฉพาะลอนกระดาษ:</label>
+            <select id="cfgFluteFilter" class="w-full px-2 py-0.5 border border-slate-300 rounded font-semibold text-slate-700 bg-white">
+              <option value="ALL">ทุกลอน (BC, B, C, etc.)</option>
+              <option value="BC">เฉพาะลอน BC</option>
+              <option value="B">เฉพาะลอน B</option>
+              <option value="C">เฉพาะลอน C</option>
+            </select>
+            <p class="text-[10px] text-slate-400">เลือกดูเฉพาะไลน์ลอนที่กำลังขึ้นงานได้</p>
+          </div>
+        </div>
       </div>
 
-      <!-- กล่องว่าง -->
-      <div id="emptyBox" class="hidden py-6 text-center text-slate-500 font-bold text-xs">
-        ✅ ไม่พบออเดอร์ที่ผิดปกติตามเกณฑ์นี้
+      <!-- พื้นที่แคปภาพของหน้า 1 -->
+      <div id="captureArea" class="bg-white rounded-lg border border-slate-300 shadow-sm overflow-hidden">
+        <div class="bg-slate-900 text-white px-3 py-2 flex items-center justify-between gap-2 border-b border-slate-800">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[11px] font-extrabold">สรุป</span>
+            <span id="planHeaderTitle" class="font-extrabold text-amber-300 text-xs sm:text-sm">กรุณาลากไฟล์แผนการผลิต Excel (.xlsx / .csv) มาวาง</span>
+            <span id="activeRulesSummary" class="text-slate-300 text-[11px] hidden sm:inline bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+              เงื่อนไข: ตรวจ M5-M1 &lt; <span class="th-val">300</span> ม.
+            </span>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-300">ผิดปกติ: <strong class="text-rose-400 text-sm font-black" id="anomalyCountBadge">0</strong> ใบ</span>
+            <span class="text-slate-500">/</span>
+            <span class="text-slate-400">ทั้งหมด: <strong class="text-white" id="allOrderCountBadge">0</strong></span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="compact-table w-full text-left border-collapse text-xs font-medium">
+            <thead>
+              <tr class="bg-slate-800 text-white text-[11px] font-bold border-b border-slate-700 select-none">
+                <th class="text-center w-10 border-r border-slate-700">ลำดับ</th>
+                <th class="w-32 border-r border-slate-700">PDR / ออเดอร์</th>
+                <th class="border-r border-slate-700">ชื่อลูกค้า</th>
+                <th class="text-center w-10 border-r border-slate-700">ลอน</th>
+                <th class="text-center w-16 border-r border-slate-700">หน้ากว้าง</th>
+                <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M5 (หน้า)</th>
+                <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M4 (ลอนB)</th>
+                <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M3 (กลาง)</th>
+                <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M2 (ลอนC)</th>
+                <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M1 (หลัง)</th>
+                <th class="text-right w-20 bg-rose-950 text-amber-300 border-r border-slate-700">ยาวรวม (ม.)</th>
+                <th class="w-48 text-slate-200">สาเหตุ / ชั้นที่ไม่ต่อกัน</th>
+              </tr>
+            </thead>
+            <tbody id="planTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+
+        <div id="emptyBox" class="hidden py-6 text-center text-slate-500 font-bold text-xs"></div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- หน้า 2: วิเคราะห์ออเดอร์ (สัดส่วน % แกรม บาง/กลาง/หนา & สั้น/กลาง/ยาว) -->
+    <!-- =================================================================== -->
+    <div id="viewAnalysis" class="hidden space-y-2.5">
+
+      <!-- แถบปรับตัวเลือกการวิเคราะห์ (ไม่ติดไปในรูปที่แคป) -->
+      <div class="bg-white rounded-lg p-2.5 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- วิธีคิดแกรมของออเดอร์ -->
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold text-slate-700">วิธีวัดแกรมออเดอร์:</span>
+            <select id="anaGramSource" class="px-2 py-1 border border-slate-300 rounded font-bold text-slate-800 bg-slate-50">
+              <option value="max">แกรมสูงสุดในออเดอร์ (M5-M1)</option>
+              <option value="m5">แกรมกระดาษหน้า (M5 เท่านั้น)</option>
+              <option value="all_layers">นับแยกทุกชั้นม้วนที่ใช้ (M5-M1)</option>
+            </select>
+          </div>
+
+          <!-- กรองเฉพาะลอน -->
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold text-slate-700">ลอน:</span>
+            <select id="anaFluteFilter" class="px-2 py-1 border border-slate-300 rounded font-bold text-slate-800 bg-slate-50">
+              <option value="ALL">ทุกลอน</option>
+              <option value="BC">เฉพาะ BC</option>
+              <option value="B">เฉพาะ B</option>
+              <option value="C">เฉพาะ C</option>
+            </select>
+          </div>
+
+          <!-- ปรับเกณฑ์สั้น/กลาง/ยาว -->
+          <div class="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded border border-slate-200 font-bold">
+            <span class="text-slate-600">สั้น &lt;</span>
+            <input id="anaShortMax" type="number" value="300" min="50" max="2000" step="50" class="w-14 px-1 py-0.5 text-center bg-white border border-slate-300 rounded text-rose-600" />
+            <span class="text-slate-600 mx-1">| ยาว ≥</span>
+            <input id="anaLongMin" type="number" value="700" min="100" max="5000" step="50" class="w-14 px-1 py-0.5 text-center bg-white border border-slate-300 rounded text-emerald-700" />
+            <span class="text-slate-600 ml-0.5">ม.</span>
+          </div>
+        </div>
+
+        <label class="inline-flex items-center gap-1.5 font-bold text-slate-700 cursor-pointer bg-slate-50 px-2.5 py-1 rounded border border-slate-200">
+          <input id="chkIncludeAnaTableInImg" type="checkbox" class="rounded text-blue-600" />
+          <span>รวมตารางรายชื่อออเดอร์ในรูปที่บันทึกด้วย</span>
+        </label>
+      </div>
+
+      <!-- พื้นที่สำหรับแคปเป็นรูปภาพรายงานวิเคราะห์ -->
+      <div id="analysisCaptureArea" class="bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden">
+
+        <!-- Header รายงานวิเคราะห์ -->
+        <div class="bg-slate-900 text-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-blue-600 text-white text-[11px] font-extrabold">ORDER ANALYSIS</span>
+              <h2 id="anaPlanTitle" class="text-sm sm:text-base font-extrabold text-amber-300">กรุณาลากไฟล์แผนการผลิต Excel มาวาง</h2>
+            </div>
+            <p id="anaSubtitle" class="text-[11px] text-slate-300 mt-0.5">
+              วิเคราะห์สัดส่วน % ออเดอร์ตามความยาว (สั้น / กลาง / ยาว) และความหนากระดาษ (แกรมบาง / กลาง / หนา)
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+            <div class="text-center">
+              <div class="text-[10px] text-slate-400">จำนวนออเดอร์</div>
+              <div class="text-base font-black text-white"><span id="anaTotalOrders">0</span> <span class="text-[10px] font-normal text-slate-300">ใบ</span></div>
+            </div>
+            <div class="h-6 w-px bg-slate-700"></div>
+            <div class="text-center">
+              <div class="text-[10px] text-slate-400">ความยาวรวม</div>
+              <div class="text-base font-black text-emerald-400"><span id="anaTotalMeters">0</span> <span class="text-[10px] font-normal text-slate-300">ม.</span></div>
+            </div>
+            <div class="h-6 w-px bg-slate-700"></div>
+            <div class="text-center">
+              <div class="text-[10px] text-slate-400">เฉลี่ย/ออเดอร์</div>
+              <div class="text-base font-black text-amber-300"><span id="anaAvgMeters">0</span> <span class="text-[10px] font-normal text-slate-300">ม.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- กรณีไม่มีข้อมูลในหน้าวิเคราะห์ -->
+        <div id="anaEmptyBox" class="py-12 text-center text-slate-400 space-y-1">
+          <i data-lucide="bar-chart-3" class="w-9 h-9 mx-auto text-slate-300 mb-1"></i>
+          <div class="text-sm font-bold text-slate-600">ยังไม่มีข้อมูลแผนการผลิตสำหรับวิเคราะห์</div>
+          <div class="text-xs text-slate-400">กรุณาลากไฟล์ Excel มาวางด้านบน หรือกดปุ่ม "โหลดแผนตัวอย่าง" เพื่อดูผลการวิเคราะห์</div>
+        </div>
+
+        <!-- เนื้อหาผลการวิเคราะห์ (ซ่อนเมื่อไม่มีข้อมูล) -->
+        <div id="anaContent" class="hidden p-4 space-y-4">
+
+          <!-- 1. กล่องสรุปผลแผนนี้ (Executive Verdict) -->
+          <div id="anaVerdictBox" class="rounded-xl border-2 p-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white">สรุปผลแผนการผลิตนี้</span>
+                <span id="anaMainVerdictBadge" class="text-sm sm:text-base font-black px-2.5 py-0.5 rounded-md"></span>
+              </div>
+              <p id="anaVerdictDetail" class="text-xs sm:text-sm font-semibold text-slate-800"></p>
+              <p id="anaVerdictMeterNote" class="text-xs text-slate-600"></p>
+            </div>
+            <div id="anaGramVerdictBox" class="bg-white/90 border border-slate-200 rounded-lg px-3 py-2 text-right shadow-sm">
+              <div class="text-[10px] text-slate-500 font-bold">แกรมกระดาษหลักของแผน</div>
+              <div id="anaGramVerdictText" class="text-sm font-black text-slate-900">-</div>
+            </div>
+          </div>
+
+          <!-- 2. วิเคราะห์สัดส่วนความยาวออเดอร์ (สั้น / กลาง / ยาว) -->
+          <div class="border border-slate-200 rounded-xl p-3.5 space-y-3 bg-slate-50/50">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
+                <span>1. สัดส่วน % ความยาวออเดอร์ (สั้น / กลาง / ยาว)</span>
+              </h3>
+              <span class="text-[11px] text-slate-500 font-medium">
+                สั้น: &lt; <span class="ana-short-lbl">300</span> ม. | กลาง: <span class="ana-short-lbl">300</span>–<span class="ana-long-lbl">700</span> ม. | ยาว: ≥ <span class="ana-long-lbl">700</span> ม.
+              </span>
+            </div>
+
+            <!-- 100% Stacked Bar: Count % vs Meters % -->
+            <div class="space-y-1.5">
+              <div>
+                <div class="flex justify-between text-[11px] font-bold text-slate-600 mb-0.5">
+                  <span>สัดส่วนตามจำนวนออเดอร์ (% ของจำนวนใบ)</span>
+                  <span id="lenCountBarLabels"></span>
+                </div>
+                <div id="lenCountBar" class="w-full h-5 rounded-md overflow-hidden flex bg-slate-200 text-[10px] font-extrabold text-white shadow-inner"></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-[11px] font-bold text-slate-600 mb-0.5">
+                  <span>สัดส่วนตามระยะเมตรผลิต (% ของเมตรรวมทั้งแผน)</span>
+                  <span id="lenMeterBarLabels"></span>
+                </div>
+                <div id="lenMeterBar" class="w-full h-4 rounded-md overflow-hidden flex bg-slate-200 text-[10px] font-bold text-white shadow-inner"></div>
+              </div>
+            </div>
+
+            <!-- 3 Cards: สั้น / กลาง / ยาว -->
+            <div id="lenCardsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5"></div>
+          </div>
+
+          <!-- 3. วิเคราะห์สัดส่วนแกรมกระดาษ (บาง / กลาง / หนา) -->
+          <div class="border border-slate-200 rounded-xl p-3.5 space-y-3 bg-slate-50/50">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+                <span>2. สัดส่วน % ความหนากระดาษ (<span id="anaGramModeTitle">แกรมสูงสุดในออเดอร์</span>)</span>
+              </h3>
+              <span class="text-[11px] text-slate-500 font-medium">
+                บาง: 105, 125, 140 (≤140) | กลาง: 150, 170 | หนา: 175 ขึ้นไป
+              </span>
+            </div>
+
+            <!-- 100% Stacked Bar: Gram % -->
+            <div>
+              <div class="flex justify-between text-[11px] font-bold text-slate-600 mb-0.5">
+                <span id="gramBarTitle">สัดส่วนกลุ่มแกรม (% ของจำนวนรายการ)</span>
+                <span id="gramBarLabels"></span>
+              </div>
+              <div id="gramCountBar" class="w-full h-5 rounded-md overflow-hidden flex bg-slate-200 text-[10px] font-extrabold text-white shadow-inner"></div>
+            </div>
+
+            <!-- 3 Cards: บาง / กลาง / หนา -->
+            <div id="gramCardsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5"></div>
+          </div>
+
+          <!-- 4. ตารางไขว้ 3x3 (แกรมกระดาษ x ความยาวออเดอร์) -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-slate-800 text-white px-3 py-2 flex items-center justify-between">
+              <span class="font-bold text-xs">3. ตารางสรุปไขว้: กลุ่มแกรมกระดาษ × ความยาวออเดอร์ (คลิกช่องเพื่อดูรายชื่อออเดอร์)</span>
+              <span class="text-[10px] text-slate-300">แสดง: จำนวนใบ (% ของแผน) | ระยะเมตรรวม</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-center border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-300 text-[11px]">
+                    <th class="py-2 px-3 text-left border-r border-slate-200">กลุ่มแกรม \ ความยาว</th>
+                    <th class="py-2 px-3 border-r border-slate-200 text-rose-700">ออเดอร์สั้น (&lt; <span class="ana-short-lbl">300</span> ม.)</th>
+                    <th class="py-2 px-3 border-r border-slate-200 text-amber-700">ออเดอร์กลาง (<span class="ana-short-lbl">300</span>–<span class="ana-long-lbl">700</span> ม.)</th>
+                    <th class="py-2 px-3 border-r border-slate-200 text-emerald-700">ออเดอร์ยาว (≥ <span class="ana-long-lbl">700</span> ม.)</th>
+                    <th class="py-2 px-3 bg-slate-200 text-slate-900">รวมกลุ่มแกรม</th>
+                  </tr>
+                </thead>
+                <tbody id="crossMatrixBody" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- รายชื่อออเดอร์ในหน้าวิเคราะห์ (วางไว้ในหรือนอก capture ตาม checkbox) -->
+          <div id="anaOrdersInsideSlot"></div>
+
+        </div>
+      </div>
+
+      <!-- ส่วนรายชื่อออเดอร์สำหรับดูรายละเอียดแบบเจาะจง (Drill-down List) -->
+      <div id="anaDrilldownContainer" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="bg-slate-100 px-3 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-extrabold text-slate-800 text-xs">📋 รายการออเดอร์จำแนกกลุ่ม</span>
+            <span id="anaDrillFilterBadge" class="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold">ทั้งหมด</span>
+          </div>
+          <div class="flex items-center gap-1 flex-wrap text-[11px] font-bold">
+            <button type="button" onclick="setAnalysisDrillFilter('ALL','ALL')" class="px-2 py-0.5 rounded bg-slate-800 text-white cursor-pointer">ทั้งหมด</button>
+            <button type="button" onclick="setAnalysisDrillFilter('ALL','short')" class="px-2 py-0.5 rounded bg-rose-100 text-rose-800 hover:bg-rose-200 cursor-pointer">สั้น</button>
+            <button type="button" onclick="setAnalysisDrillFilter('ALL','medium')" class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer">กลาง</button>
+            <button type="button" onclick="setAnalysisDrillFilter('ALL','long')" class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer">ยาว</button>
+            <span class="text-slate-300 mx-0.5">|</span>
+            <button type="button" onclick="setAnalysisDrillFilter('thin','ALL')" class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 hover:bg-sky-200 cursor-pointer">แกรมบาง</button>
+            <button type="button" onclick="setAnalysisDrillFilter('medium','ALL')" class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 hover:bg-indigo-200 cursor-pointer">แกรมกลาง</button>
+            <button type="button" onclick="setAnalysisDrillFilter('thick','ALL')" class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 hover:bg-purple-200 cursor-pointer">แกรมหนา</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="compact-table w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-800 text-white text-[11px]">
+                <th class="text-center w-10 border-r border-slate-700">ลำดับ</th>
+                <th class="w-32 border-r border-slate-700">PDR</th>
+                <th class="border-r border-slate-700">ลูกค้า</th>
+                <th class="text-center w-10 border-r border-slate-700">ลอน</th>
+                <th class="text-center w-14 border-r border-slate-700">กว้าง</th>
+                <th class="text-center border-r border-slate-700">กระดาษ (M5–M1)</th>
+                <th class="text-center w-20 border-r border-slate-700">แกรมหลัก</th>
+                <th class="text-center w-24 border-r border-slate-700">กลุ่มแกรม</th>
+                <th class="text-right w-20 border-r border-slate-700">ยาวรวม (ม.)</th>
+                <th class="text-center w-24">กลุ่มความยาว</th>
+              </tr>
+            </thead>
+            <tbody id="anaDrillTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
       </div>
 
     </div>
