@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>เช็คแผนผลิตกระดาษลูกฟูก (M1-M5 < 300 เมตร)</title>
+  <title>เช็คแผนผลิตกระดาษลูกฟูก (M1-M5 Inspector)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,7 +21,6 @@
       border-color: #2563eb !important;
       background-color: #eff6ff !important;
     }
-    /* Compact Table Styles */
     table td, table th {
       padding: 3px 6px !important;
       line-height: 1.25;
@@ -30,16 +29,22 @@
 </head>
 <body class="min-h-screen pb-6 text-xs">
 
-  <!-- Top Bar ขนาดกะทัดรัด -->
+  <!-- Top Bar -->
   <div class="bg-slate-900 text-white shadow sticky top-0 z-30">
     <div class="max-w-6xl mx-auto px-3 py-2 flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <span class="w-6 h-6 rounded bg-rose-600 flex items-center justify-center font-extrabold text-xs">M</span>
-        <h1 class="text-sm font-bold">เช็คแผนผลิต: กระดาษ M1-M5 ไม่ต่อกัน &lt; 300 ม.</h1>
+        <h1 class="text-sm font-bold">เช็คแผนผลิต: ตรวจจับกระดาษ M1-M5 ไม่ต่อกัน</h1>
       </div>
 
-      <!-- ปุ่มอัปโหลด & บันทึกรูป -->
+      <!-- ปุ่มอัปโหลด / บันทึกรูป / ตัวตั้งค่า -->
       <div class="flex items-center gap-1.5 flex-wrap">
+        <button id="btnToggleSettings" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 cursor-pointer transition font-bold text-xs shadow-sm">
+          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>ตั้งค่าเงื่อนไขการตรวจ</span>
+          <span id="settingsActiveDot" class="w-2 h-2 rounded-full bg-emerald-400 ml-0.5"></span>
+        </button>
+
         <label for="fileInput" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white cursor-pointer transition font-bold text-xs shadow-sm">
           <i data-lucide="upload" class="w-3.5 h-3.5"></i>
           <span>โยน/เลือกไฟล์ Excel</span>
@@ -48,18 +53,84 @@
 
         <button id="btnCopyImg" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer transition font-bold text-xs">
           <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-          <span>คัดลอกรูป (Ctrl+V ใน LINE)</span>
+          <span>คัดลอกรูป (LINE)</span>
         </button>
 
         <button id="btnSaveImg" type="button" class="inline-flex items-center gap-1 px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition font-bold text-xs shadow-sm">
           <i data-lucide="download" class="w-3.5 h-3.5"></i>
-          <span>บันทึกรูป PNG คมชัดสูง</span>
+          <span>บันทึกรูปภาพ (PNG 3x)</span>
         </button>
       </div>
     </div>
   </div>
 
   <div class="max-w-6xl mx-auto px-3 mt-2.5 space-y-2">
+
+    <!-- แผงตั้งค่าเงื่อนไขขั้นสูง (พับ/กางได้ สำหรับการใช้งานในอนาคต) -->
+    <div id="settingsPanel" class="hidden bg-white border-2 border-amber-400/80 rounded-lg p-3 shadow-md space-y-2.5 transition-all">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-1.5">
+        <div class="flex items-center gap-1.5 font-bold text-slate-800 text-xs sm:text-sm">
+          <i data-lucide="settings" class="w-4 h-4 text-amber-600"></i>
+          <span>ตั้งค่าเงื่อนไขการตรวจจับความผิดปกติ (Filter Rules Configuration)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnResetSettings" type="button" class="text-[11px] text-slate-500 hover:text-rose-600 underline cursor-pointer">
+            รีเซ็ตค่ามาตรฐาน (300 ม. / เช็ค M1-M5 ทุกชั้น)
+          </button>
+          <button id="btnCloseSettings" type="button" class="text-slate-400 hover:text-slate-700 text-sm font-bold px-1.5">✕</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        
+        <!-- เงื่อนไข 1: เกณฑ์ความยาวเมตร -->
+        <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
+          <label class="block font-bold text-slate-700">1. เกณฑ์ความยาวรวม (เมตร):</label>
+          <div class="flex items-center gap-1">
+            <span class="text-slate-500">น้อยกว่า (&lt;)</span>
+            <input id="cfgThreshold" type="number" value="300" min="10" max="5000" step="10" class="w-16 px-1.5 py-0.5 font-bold text-rose-600 border border-slate-300 rounded text-center bg-white" />
+            <span class="text-slate-500">ม.</span>
+          </div>
+          <p class="text-[10px] text-slate-400">ถ้าออเดอร์ยาวต่ำกว่านี้และเปลี่ยนโค้ดจะเตือน</p>
+        </div>
+
+        <!-- เงื่อนไข 2: เลือกชั้นกระดาษที่ต้องการเช็ค -->
+        <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
+          <label class="block font-bold text-slate-700">2. เลือกชั้นกระดาษที่ตรวจ:</label>
+          <div class="flex items-center gap-2 font-bold text-slate-800">
+            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM5" checked class="cfg-layer rounded text-rose-600" /> M5</label>
+            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM4" checked class="cfg-layer rounded text-rose-600" /> M4</label>
+            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM3" checked class="cfg-layer rounded text-rose-600" /> M3</label>
+            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM2" checked class="cfg-layer rounded text-rose-600" /> M2</label>
+            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" id="chkM1" checked class="cfg-layer rounded text-rose-600" /> M1</label>
+          </div>
+          <p class="text-[10px] text-slate-400">ติ๊กเฉพาะชั้นที่สนใจ หรือตรวจครบทั้ง 5 ชั้น</p>
+        </div>
+
+        <!-- เงื่อนไข 3: เช็คการเปลี่ยนหน้ากว้างกระดาษ -->
+        <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
+          <label class="block font-bold text-slate-700">3. ตรวจการเปลี่ยนหน้ากว้าง:</label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
+            <input type="checkbox" id="chkWidthChange" checked class="rounded text-rose-600" />
+            <span>เตือนเมื่อเปลี่ยนหน้ากว้าง &lt; เกณฑ์</span>
+          </label>
+          <p class="text-[10px] text-slate-400">เช็คกรณีเปลี่ยนหน้ากว้างเดี่ยวๆ (เช่น 1690 มม.)</p>
+        </div>
+
+        <!-- เงื่อนไข 4: กรองเฉพาะลอน -->
+        <div class="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
+          <label class="block font-bold text-slate-700">4. กรองเฉพาะลอนกระดาษ:</label>
+          <select id="cfgFluteFilter" class="w-full px-2 py-0.5 border border-slate-300 rounded font-semibold text-slate-700 bg-white">
+            <option value="ALL">ทุกลอน (BC, B, C, etc.)</option>
+            <option value="BC">เฉพาะลอน BC</option>
+            <option value="B">เฉพาะลอน B</option>
+            <option value="C">เฉพาะลอน C</option>
+          </select>
+          <p class="text-[10px] text-slate-400">เลือกดูเฉพาะไลน์ลอนที่กำลังขึ้นงานได้</p>
+        </div>
+
+      </div>
+    </div>
 
     <!-- แถบควบคุมขนาดกะทัดรัด (ช่องแคบลง) -->
     <div class="bg-white rounded-lg p-2 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-2">
@@ -70,7 +141,7 @@
         <span id="fileStatusText" class="text-[11px] text-slate-400 border-l border-slate-200 pl-2">ตัวอย่าง: 10/11/69 PLAN 1 MC BHS</span>
       </div>
 
-      <!-- สลับโหมด & ปรับเมตร -->
+      <!-- สลับโหมด & ปรับเมตรด่วน -->
       <div class="flex items-center gap-2 flex-wrap">
         <div class="inline-flex rounded bg-slate-100 p-0.5 border border-slate-200 text-xs font-bold">
           <button type="button" data-mode="anomaly_with_context" class="mode-btn px-2.5 py-1 rounded bg-rose-600 text-white shadow-sm transition">
@@ -103,12 +174,14 @@
     <!-- =================================================================== -->
     <div id="captureArea" class="bg-white rounded-lg border border-slate-300 shadow-sm overflow-hidden">
 
-      <!-- หัวเรื่องแคปภาพ (สูงลดลง กะทัดรัด) -->
+      <!-- หัวเรื่องแคปภาพ -->
       <div class="bg-slate-900 text-white px-3 py-2 flex items-center justify-between gap-2 border-b border-slate-800">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <span class="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[11px] font-extrabold">สรุป</span>
           <span id="planHeaderTitle" class="font-extrabold text-amber-300 text-xs sm:text-sm">วันที่ 10/11/69 PLAN 1 MC BHS</span>
-          <span class="text-slate-400 text-[11px] hidden sm:inline">| เกณฑ์: กระดาษ M5-M1 ไม่ต่อกัน และ ยาวรวม &lt; <span class="th-val">300</span> เมตร</span>
+          <span id="activeRulesSummary" class="text-slate-300 text-[11px] hidden sm:inline bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+            เงื่อนไข: ตรวจ M5-M1 &lt; <span class="th-val">300</span> ม.
+          </span>
         </div>
 
         <div class="flex items-center gap-2 text-xs">

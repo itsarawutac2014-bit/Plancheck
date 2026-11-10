@@ -1,8 +1,8 @@
 /**
- * ระบบเช็คแผนผลิตกระดาษลูกฟูก (แบบช่องกะทัดรัด แคบ ไม่กินที่)
+ * ระบบเช็คแผนผลิตกระดาษลูกฟูก (แบบปรับเปลี่ยนเงื่อนไขได้ยืดหยุ่น สำหรับการใช้งานในอนาคต)
  */
 
-const LAYERS = ['m5', 'm4', 'm3', 'm2', 'm1'];
+const ALL_LAYERS = ['m5', 'm4', 'm3', 'm2', 'm1'];
 const LAYER_NAMES = { m5: 'M5', m4: 'M4', m3: 'M3', m2: 'M2', m1: 'M1' };
 
 let state = {
@@ -11,7 +11,13 @@ let state = {
   analyzedOrders: [],
   mode: 'anomaly_with_context', // 'anomaly_with_context' | 'anomaly_only' | 'all'
   threshold: 300,
-  sheets: {}
+  sheets: {},
+  // การตั้งค่าเงื่อนไขขั้นสูง (Settings)
+  config: {
+    checkedLayers: { m5: true, m4: true, m3: true, m2: true, m1: true },
+    checkWidthChange: true,
+    fluteFilter: 'ALL' // 'ALL' | 'BC' | 'B' | 'C'
+  }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -51,6 +57,16 @@ function bindEvents() {
     }
   });
 
+  // เปิด/ปิดแผงตั้งค่าเงื่อนไข
+  const settingsPanel = document.getElementById('settingsPanel');
+  document.getElementById('btnToggleSettings').addEventListener('click', () => {
+    settingsPanel.classList.toggle('hidden');
+  });
+  document.getElementById('btnCloseSettings').addEventListener('click', () => {
+    settingsPanel.classList.add('hidden');
+  });
+
+  // สลับโหมดการดู
   document.querySelectorAll('.mode-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.mode = btn.getAttribute('data-mode');
@@ -65,15 +81,64 @@ function bindEvents() {
     });
   });
 
-  document.getElementById('thresholdInput').addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
+  // ช่องปรับเกณฑ์เมตร (ทั้งสองช่องให้ sync กัน)
+  const syncThreshold = (val) => {
     if (!isNaN(val) && val > 0) {
       state.threshold = val;
+      document.getElementById('thresholdInput').value = val;
+      document.getElementById('cfgThreshold').value = val;
       document.querySelectorAll('.th-val').forEach((el) => (el.textContent = val));
       analyzeAndRender();
     }
+  };
+
+  document.getElementById('thresholdInput').addEventListener('input', (e) => {
+    syncThreshold(parseFloat(e.target.value));
+  });
+  document.getElementById('cfgThreshold').addEventListener('input', (e) => {
+    syncThreshold(parseFloat(e.target.value));
   });
 
+  // เช็คบ็อกซ์เลือกชั้นกระดาษ M5..M1
+  ALL_LAYERS.forEach((lk) => {
+    const chk = document.getElementById(`chk${lk.toUpperCase()}`);
+    if (chk) {
+      chk.addEventListener('change', (e) => {
+        state.config.checkedLayers[lk] = e.target.checked;
+        analyzeAndRender();
+      });
+    }
+  });
+
+  // เช็คบ็อกซ์เช็คการเปลี่ยนหน้ากว้าง
+  document.getElementById('chkWidthChange').addEventListener('change', (e) => {
+    state.config.checkWidthChange = e.target.checked;
+    analyzeAndRender();
+  });
+
+  // ดรอปดาวน์กรองเฉพาะลอน
+  document.getElementById('cfgFluteFilter').addEventListener('change', (e) => {
+    state.config.fluteFilter = e.target.value;
+    analyzeAndRender();
+  });
+
+  // ปุ่มรีเซ็ตค่ามาตรฐาน
+  document.getElementById('btnResetSettings').addEventListener('click', () => {
+    syncThreshold(300);
+    ALL_LAYERS.forEach((lk) => {
+      state.config.checkedLayers[lk] = true;
+      const el = document.getElementById(`chk${lk.toUpperCase()}`);
+      if (el) el.checked = true;
+    });
+    state.config.checkWidthChange = true;
+    document.getElementById('chkWidthChange').checked = true;
+    state.config.fluteFilter = 'ALL';
+    document.getElementById('cfgFluteFilter').value = 'ALL';
+    analyzeAndRender();
+    notify('รีเซ็ตเงื่อนไขกลับเป็นค่ามาตรฐานแล้ว');
+  });
+
+  // ปุ่มบันทึกรูปภาพ & คัดลอกรูป
   document.getElementById('btnSaveImg').addEventListener('click', () => {
     const area = document.getElementById('captureArea');
     const cleanName = (state.planTitle || 'Plan').replace(/[^a-zA-Z0-9ก-๙_-]/g, '_');
@@ -101,7 +166,10 @@ function cleanCode(val) {
   return s === 'NaN' || s === '0' || s === '-' ? '' : s;
 }
 
-function analyzeOrders(orders, threshold) {
+/**
+ * วิเคราะห์การต่อกันของกระดาษตามเงื่อนไขที่ผู้ใช้กำหนด (Configurable Rules)
+ */
+function analyzeOrders(orders, threshold, config) {
   const n = orders.length;
   const list = orders.map((o, idx) => ({
     ...o,
@@ -117,7 +185,8 @@ function analyzeOrders(orders, threshold) {
     layers: {}
   }));
 
-  LAYERS.forEach((lk) => {
+  // เช็คความต่อเนื่องของแต่ละชั้น M5..M1
+  ALL_LAYERS.forEach((lk) => {
     let i = 0;
     while (i < n) {
       const code = list[i][lk];
@@ -158,39 +227,67 @@ function analyzeOrders(orders, threshold) {
     }
   });
 
+  // สรุปแต่ละออเดอร์ตามเงื่อนไขที่เลือก (config)
   list.forEach((o, idx) => {
     const prev = idx > 0 ? list[idx - 1] : null;
     const next = idx + 1 < n ? list[idx + 1] : null;
 
     const brokenLayers = [];
-    LAYERS.forEach((lk) => {
-      const info = o.layers[lk];
-      if (info && info.active && info.isBrokenShort) {
-        brokenLayers.push({
-          key: lk,
-          name: LAYER_NAMES[lk],
-          code: info.code,
-          prevCode: info.prevCode,
-          nextCode: info.nextCode,
-          runMeters: info.runMeters
-        });
+    ALL_LAYERS.forEach((lk) => {
+      // ตรวจสอบเฉพาะชั้นกระดาษที่ผู้ใช้เปิดใช้งานใน config.checkedLayers
+      if (config.checkedLayers[lk]) {
+        const info = o.layers[lk];
+        if (info && info.active && info.isBrokenShort) {
+          brokenLayers.push({
+            key: lk,
+            name: LAYER_NAMES[lk],
+            code: info.code,
+            prevCode: info.prevCode,
+            nextCode: info.nextCode,
+            runMeters: info.runMeters
+          });
+        }
       }
     });
 
+    // ตรวจสอบการเปลี่ยนหน้ากว้าง (ถ้าเปิดไว้)
     const widthChangedBothSides =
-      (!prev || prev.widthMm !== o.widthMm) && (!next || next.widthMm !== o.widthMm);
+      config.checkWidthChange &&
+      (!prev || prev.widthMm !== o.widthMm) &&
+      (!next || next.widthMm !== o.widthMm);
 
     o.brokenLayers = brokenLayers;
     o.widthChangedBothSides = widthChangedBothSides;
-    o.isAnomaly = o.totalMeters < threshold && (brokenLayers.length > 0 || widthChangedBothSides);
+
+    // เช็คว่าตรงกับตัวกรองลอนหรือไม่
+    const matchFlute =
+      config.fluteFilter === 'ALL' ||
+      (o.flute && o.flute.toUpperCase() === config.fluteFilter.toUpperCase());
+
+    // ออเดอร์จะผิดปกติเมื่อ: ลอนตรง + ยาวรวม < threshold + (มีชั้นกระดาษที่เลือกไม่ต่อกัน หรือ หน้ากว้างไม่ต่อกัน)
+    o.isAnomaly = matchFlute && o.totalMeters < threshold && (brokenLayers.length > 0 || widthChangedBothSides);
+    o.matchFlute = matchFlute;
   });
 
   return list;
 }
 
 function analyzeAndRender() {
-  state.analyzedOrders = analyzeOrders(state.rawOrders, state.threshold);
+  state.analyzedOrders = analyzeOrders(state.rawOrders, state.threshold, state.config);
+  updateActiveRulesSummary();
   renderTable();
+}
+
+function updateActiveRulesSummary() {
+  const activeLayers = ALL_LAYERS.filter((lk) => state.config.checkedLayers[lk])
+    .map((lk) => lk.toUpperCase())
+    .join(',');
+
+  const fluteStr = state.config.fluteFilter === 'ALL' ? 'ทุกลอน' : `ลอน ${state.config.fluteFilter}`;
+  const widthStr = state.config.checkWidthChange ? '+หน้ากว้าง' : '';
+
+  const summary = `ตรวจ [${activeLayers || 'ไม่มี'}${widthStr}] • ${fluteStr} • เกณฑ์ &lt; ${state.threshold} ม.`;
+  document.getElementById('activeRulesSummary').innerHTML = summary;
 }
 
 function renderTable() {
@@ -213,6 +310,7 @@ function renderTable() {
   } else if (state.mode === 'all') {
     rowsToRender = all.map((o) => ({ type: 'order', order: o, isContext: false }));
   } else {
+    // anomaly_with_context: แสดงใบผิดปกติพร้อมประกบใบก่อนหน้า/ถัดไป
     const includedIdx = new Set();
     anomalies.forEach((a) => {
       if (a.idx > 0) includedIdx.add(a.idx - 1);
@@ -271,14 +369,16 @@ function renderTable() {
         ? `<span class="inline-block px-1.5 py-0.5 rounded bg-rose-600 text-white font-black text-xs">${o.seq}</span>`
         : `<span class="text-slate-600 font-bold">${o.seq}</span>`;
 
-      // M5 - M1 ขนาดแคบกะทัดรัด
-      const mCells = LAYERS.map((lk) => {
+      // M5 - M1 ขนาดแคบกะทัดรัด (ไฮไลต์เฉพาะชั้นที่ตรวจจับและผู้ใช้เปิดเช็ค)
+      const mCells = ALL_LAYERS.map((lk) => {
         const lInfo = o.layers[lk];
+        const isCheckedLayer = state.config.checkedLayers[lk];
+
         if (!lInfo || !lInfo.active) {
-          return `<td class="text-center border-r border-slate-200 text-slate-300">-</td>`;
+          return `<td class="text-center border-r border-slate-200 text-slate-300 ${!isCheckedLayer ? 'opacity-40' : ''}">-</td>`;
         }
 
-        if (isAnom && lInfo.isBrokenShort) {
+        if (isAnom && lInfo.isBrokenShort && isCheckedLayer) {
           return `
             <td class="text-center border-r border-rose-300 bg-rose-200 text-rose-950 font-black">
               <span class="bg-rose-600 text-white px-1 py-0.2 rounded text-[11px] leading-tight block">${esc(lInfo.code)}</span>
@@ -287,7 +387,7 @@ function renderTable() {
         }
 
         return `
-          <td class="text-center border-r border-slate-200 ${isAnom ? 'text-slate-900 font-bold' : 'text-slate-600'}">
+          <td class="text-center border-r border-slate-200 ${isAnom ? 'text-slate-900 font-bold' : 'text-slate-600'} ${!isCheckedLayer ? 'opacity-50' : ''}">
             ${esc(lInfo.code)}
           </td>
         `;
