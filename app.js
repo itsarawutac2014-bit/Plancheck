@@ -1,5 +1,5 @@
 /**
- * ระบบเช็คแผนผลิตกระดาษลูกฟูก (แบบปรับเปลี่ยนเงื่อนไขได้ยืดหยุ่น สำหรับการใช้งานในอนาคต)
+ * ระบบเช็คแผนผลิตกระดาษลูกฟูก (แบบล้างข้อมูลเก่าออกหมดเสมอเมื่อเปิดหน้าเว็บใหม่)
  */
 
 const ALL_LAYERS = ['m5', 'm4', 'm3', 'm2', 'm1'];
@@ -12,18 +12,18 @@ let state = {
   mode: 'anomaly_with_context', // 'anomaly_with_context' | 'anomaly_only' | 'all'
   threshold: 300,
   sheets: {},
-  // การตั้งค่าเงื่อนไขขั้นสูง (Settings)
   config: {
     checkedLayers: { m5: true, m4: true, m3: true, m2: true, m1: true },
     checkWidthChange: true,
-    fluteFilter: 'ALL' // 'ALL' | 'BC' | 'B' | 'C'
+    fluteFilter: 'ALL'
   }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
   lucide.createIcons();
   bindEvents();
-  loadSample();
+  // เมื่อเปิดหน้าเว็บหรือรีเฟรช ให้เริ่มต้นด้วยหน้าจอว่างเปล่า (ล้างข้อมูลเก่าออกเสมอ)
+  resetDashboard();
 });
 
 function bindEvents() {
@@ -57,6 +57,24 @@ function bindEvents() {
     }
   });
 
+  // ปุ่มล้างข้อมูลทั้งหมดบนหน้าจอ
+  const btnClear = document.getElementById('btnClearData');
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      resetDashboard();
+      notify('ล้างข้อมูลบนหน้าจอเรียบร้อยแล้ว');
+    });
+  }
+
+  // ปุ่มโหลดแผนตัวอย่าง (ไว้ให้กดดูตัวอย่างได้เมื่อต้องการ)
+  const btnSample = document.getElementById('btnLoadSample');
+  if (btnSample) {
+    btnSample.addEventListener('click', () => {
+      loadSample();
+      notify('โหลดข้อมูลตัวอย่างเรียบร้อย');
+    });
+  }
+
   // เปิด/ปิดแผงตั้งค่าเงื่อนไข
   const settingsPanel = document.getElementById('settingsPanel');
   document.getElementById('btnToggleSettings').addEventListener('click', () => {
@@ -81,7 +99,7 @@ function bindEvents() {
     });
   });
 
-  // ช่องปรับเกณฑ์เมตร (ทั้งสองช่องให้ sync กัน)
+  // ช่องปรับเกณฑ์เมตร (sync ทั้ง 2 ช่อง)
   const syncThreshold = (val) => {
     if (!isNaN(val) && val > 0) {
       state.threshold = val;
@@ -140,17 +158,48 @@ function bindEvents() {
 
   // ปุ่มบันทึกรูปภาพ & คัดลอกรูป
   document.getElementById('btnSaveImg').addEventListener('click', () => {
+    if (state.rawOrders.length === 0) {
+      notify('ยังไม่มีข้อมูลแผนผลิต กรุณาโยนไฟล์ Excel ก่อนครับ', true);
+      return;
+    }
     const area = document.getElementById('captureArea');
     const cleanName = (state.planTitle || 'Plan').replace(/[^a-zA-Z0-9ก-๙_-]/g, '_');
     exportImage(area, `สรุปแผนผลิต_${cleanName}.png`, false);
   });
 
   document.getElementById('btnCopyImg').addEventListener('click', () => {
+    if (state.rawOrders.length === 0) {
+      notify('ยังไม่มีข้อมูลแผนผลิต กรุณาโยนไฟล์ Excel ก่อนครับ', true);
+      return;
+    }
     const area = document.getElementById('captureArea');
     exportImage(area, 'clipboard.png', true);
   });
 }
 
+/**
+ * ล้างข้อมูลออกหมดเสมอ (เมื่อเปิดหน้าใหม่หรือรีเฟรช)
+ */
+function resetDashboard() {
+  state.planTitle = '';
+  state.rawOrders = [];
+  state.analyzedOrders = [];
+  state.sheets = {};
+
+  const fileInput = document.getElementById('fileInput');
+  if (fileInput) fileInput.value = '';
+
+  document.getElementById('fileStatusText').textContent = 'ยังไม่มีไฟล์ — กรุณาลากไฟล์แผนผลิตมาวาง';
+  document.getElementById('planHeaderTitle').textContent = 'กรุณาลากไฟล์แผนการผลิต Excel (.xlsx / .csv) มาวาง';
+  document.getElementById('sheetBar').classList.add('hidden');
+  document.getElementById('sheetButtons').innerHTML = '';
+
+  analyzeAndRender();
+}
+
+/**
+ * โหลดตัวอย่างเมื่อผู้ใช้กดปุ่มเท่านั้น
+ */
 function loadSample() {
   if (typeof SAMPLE_PLAN_DATA !== 'undefined') {
     state.planTitle = SAMPLE_PLAN_DATA.planTitle;
@@ -166,11 +215,10 @@ function cleanCode(val) {
   return s === 'NaN' || s === '0' || s === '-' ? '' : s;
 }
 
-/**
- * วิเคราะห์การต่อกันของกระดาษตามเงื่อนไขที่ผู้ใช้กำหนด (Configurable Rules)
- */
 function analyzeOrders(orders, threshold, config) {
   const n = orders.length;
+  if (n === 0) return [];
+
   const list = orders.map((o, idx) => ({
     ...o,
     idx,
@@ -185,7 +233,6 @@ function analyzeOrders(orders, threshold, config) {
     layers: {}
   }));
 
-  // เช็คความต่อเนื่องของแต่ละชั้น M5..M1
   ALL_LAYERS.forEach((lk) => {
     let i = 0;
     while (i < n) {
@@ -227,14 +274,12 @@ function analyzeOrders(orders, threshold, config) {
     }
   });
 
-  // สรุปแต่ละออเดอร์ตามเงื่อนไขที่เลือก (config)
   list.forEach((o, idx) => {
     const prev = idx > 0 ? list[idx - 1] : null;
     const next = idx + 1 < n ? list[idx + 1] : null;
 
     const brokenLayers = [];
     ALL_LAYERS.forEach((lk) => {
-      // ตรวจสอบเฉพาะชั้นกระดาษที่ผู้ใช้เปิดใช้งานใน config.checkedLayers
       if (config.checkedLayers[lk]) {
         const info = o.layers[lk];
         if (info && info.active && info.isBrokenShort) {
@@ -250,7 +295,6 @@ function analyzeOrders(orders, threshold, config) {
       }
     });
 
-    // ตรวจสอบการเปลี่ยนหน้ากว้าง (ถ้าเปิดไว้)
     const widthChangedBothSides =
       config.checkWidthChange &&
       (!prev || prev.widthMm !== o.widthMm) &&
@@ -259,12 +303,10 @@ function analyzeOrders(orders, threshold, config) {
     o.brokenLayers = brokenLayers;
     o.widthChangedBothSides = widthChangedBothSides;
 
-    // เช็คว่าตรงกับตัวกรองลอนหรือไม่
     const matchFlute =
       config.fluteFilter === 'ALL' ||
       (o.flute && o.flute.toUpperCase() === config.fluteFilter.toUpperCase());
 
-    // ออเดอร์จะผิดปกติเมื่อ: ลอนตรง + ยาวรวม < threshold + (มีชั้นกระดาษที่เลือกไม่ต่อกัน หรือ หน้ากว้างไม่ต่อกัน)
     o.isAnomaly = matchFlute && o.totalMeters < threshold && (brokenLayers.length > 0 || widthChangedBothSides);
     o.matchFlute = matchFlute;
   });
@@ -295,13 +337,27 @@ function renderTable() {
   const threshold = state.threshold;
   const anomalies = all.filter((o) => o.isAnomaly);
 
-  document.getElementById('planHeaderTitle').textContent = state.planTitle || 'แผนการผลิตกระดาษลูกฟูก';
   document.getElementById('anomalyCountBadge').textContent = anomalies.length;
   document.getElementById('allOrderCountBadge').textContent = all.length;
   document.getElementById('totalCountText').textContent = all.length;
 
   const tbody = document.getElementById('planTableBody');
   const emptyBox = document.getElementById('emptyBox');
+
+  // ถ้ายังไม่มีข้อมูลไฟล์
+  if (all.length === 0) {
+    tbody.innerHTML = '';
+    emptyBox.classList.remove('hidden');
+    emptyBox.innerHTML = `
+      <div class="py-8 text-center text-slate-400 space-y-1">
+        <i data-lucide="file-up" class="w-8 h-8 mx-auto text-slate-300 mb-1"></i>
+        <div class="text-sm font-bold text-slate-600">ยังไม่มีข้อมูลแผนการผลิต</div>
+        <div class="text-xs text-slate-400">กรุณาลากไฟล์ Excel หรือกด "โยน/เลือกไฟล์ Excel" ด้านบนเพื่อเริ่มตรวจสอบ</div>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
 
   let rowsToRender = [];
 
@@ -310,7 +366,6 @@ function renderTable() {
   } else if (state.mode === 'all') {
     rowsToRender = all.map((o) => ({ type: 'order', order: o, isContext: false }));
   } else {
-    // anomaly_with_context: แสดงใบผิดปกติพร้อมประกบใบก่อนหน้า/ถัดไป
     const includedIdx = new Set();
     anomalies.forEach((a) => {
       if (a.idx > 0) includedIdx.add(a.idx - 1);
@@ -335,6 +390,11 @@ function renderTable() {
   if (rowsToRender.length === 0) {
     tbody.innerHTML = '';
     emptyBox.classList.remove('hidden');
+    emptyBox.innerHTML = `
+      <div class="py-6 text-center text-emerald-600 font-bold text-xs">
+        ✅ ไม่พบออเดอร์ที่ผิดปกติตามเกณฑ์นี้ (ทุกลำดับผ่านเกณฑ์เรียบร้อย)
+      </div>
+    `;
     return;
   }
   emptyBox.classList.add('hidden');
@@ -364,12 +424,10 @@ function renderTable() {
         trClass = 'bg-white hover:bg-slate-50';
       }
 
-      // ลำดับ
       const seqHtml = isAnom
         ? `<span class="inline-block px-1.5 py-0.5 rounded bg-rose-600 text-white font-black text-xs">${o.seq}</span>`
         : `<span class="text-slate-600 font-bold">${o.seq}</span>`;
 
-      // M5 - M1 ขนาดแคบกะทัดรัด (ไฮไลต์เฉพาะชั้นที่ตรวจจับและผู้ใช้เปิดเช็ค)
       const mCells = ALL_LAYERS.map((lk) => {
         const lInfo = o.layers[lk];
         const isCheckedLayer = state.config.checkedLayers[lk];
@@ -393,12 +451,10 @@ function renderTable() {
         `;
       }).join('');
 
-      // เมตร
       const metersHtml = isAnom
         ? `<strong class="text-rose-600 font-black text-xs sm:text-sm">${o.totalMeters.toLocaleString()}</strong>`
         : `<span class="font-bold ${o.totalMeters < threshold ? 'text-amber-700' : 'text-slate-700'}">${o.totalMeters.toLocaleString()}</span>`;
 
-      // สาเหตุแบบสั้นกระชับ
       let detailHtml = '';
       if (isAnom) {
         const brokenNames = o.brokenLayers.map((b) => `${b.name}(${b.code})`).join(', ');
