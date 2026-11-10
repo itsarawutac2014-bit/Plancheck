@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>เช็คแผนผลิตกระดาษลูกฟูก (M1-M5 < 300 เมตร)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    .drop-active {
+      border-color: #2563eb !important;
+      background-color: #eff6ff !important;
+    }
+    /* Compact Table Styles */
+    table td, table th {
+      padding: 3px 6px !important;
+      line-height: 1.25;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-6 text-xs">
+
+  <!-- Top Bar ขนาดกะทัดรัด -->
+  <div class="bg-slate-900 text-white shadow sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 rounded bg-rose-600 flex items-center justify-center font-extrabold text-xs">M</span>
+        <h1 class="text-sm font-bold">เช็คแผนผลิต: กระดาษ M1-M5 ไม่ต่อกัน &lt; 300 ม.</h1>
+      </div>
+
+      <!-- ปุ่มอัปโหลด & บันทึกรูป -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <label for="fileInput" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white cursor-pointer transition font-bold text-xs shadow-sm">
+          <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+          <span>โยน/เลือกไฟล์ Excel</span>
+        </label>
+        <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+
+        <button id="btnCopyImg" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer transition font-bold text-xs">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span>คัดลอกรูป (Ctrl+V ใน LINE)</span>
+        </button>
+
+        <button id="btnSaveImg" type="button" class="inline-flex items-center gap-1 px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition font-bold text-xs shadow-sm">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>บันทึกรูป PNG คมชัดสูง</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-3 mt-2.5 space-y-2">
+
+    <!-- แถบควบคุมขนาดกะทัดรัด (ช่องแคบลง) -->
+    <div class="bg-white rounded-lg p-2 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-2">
+      <!-- Drag & Drop เล็กๆ -->
+      <div id="dropZone" class="flex items-center gap-2 px-2.5 py-1 rounded border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 cursor-pointer transition">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-blue-600"></i>
+        <span class="font-semibold text-slate-700">ลากไฟล์ Excel มาวางที่นี่</span>
+        <span id="fileStatusText" class="text-[11px] text-slate-400 border-l border-slate-200 pl-2">ตัวอย่าง: 10/11/69 PLAN 1 MC BHS</span>
+      </div>
+
+      <!-- สลับโหมด & ปรับเมตร -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="inline-flex rounded bg-slate-100 p-0.5 border border-slate-200 text-xs font-bold">
+          <button type="button" data-mode="anomaly_with_context" class="mode-btn px-2.5 py-1 rounded bg-rose-600 text-white shadow-sm transition">
+            🚨 เฉพาะจุดผิดปกติ (เทียบหัว-ท้าย)
+          </button>
+          <button type="button" data-mode="anomaly_only" class="mode-btn px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition">
+            🎯 เฉพาะใบ &lt; <span class="th-val">300</span>ม.
+          </button>
+          <button type="button" data-mode="all" class="mode-btn px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition">
+            📋 ทั้งหมด (<span id="totalCountText">0</span>)
+          </button>
+        </div>
+
+        <div class="flex items-center bg-slate-100 rounded px-2 py-0.5 border border-slate-200 text-xs font-bold">
+          <span class="text-slate-600 mr-1">เกณฑ์: &lt;</span>
+          <input id="thresholdInput" type="number" value="300" min="10" max="5000" step="10" class="w-14 px-1 py-0.5 text-center font-extrabold text-rose-600 bg-white border border-slate-300 rounded" />
+          <span class="text-slate-600 ml-1">ม.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- แถบเลือกชีต -->
+    <div id="sheetBar" class="hidden bg-amber-50 border border-amber-200 rounded px-3 py-1 flex items-center gap-2 flex-wrap text-xs font-bold text-amber-900">
+      <span>ชีตแผน:</span>
+      <div id="sheetButtons" class="flex items-center gap-1 flex-wrap"></div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- พื้นที่แคปภาพ (ตารางกะทัดรัด ช่องเล็ก-แคบ อ่านเร็ว เรียงแนวยาว) -->
+    <!-- =================================================================== -->
+    <div id="captureArea" class="bg-white rounded-lg border border-slate-300 shadow-sm overflow-hidden">
+
+      <!-- หัวเรื่องแคปภาพ (สูงลดลง กะทัดรัด) -->
+      <div class="bg-slate-900 text-white px-3 py-2 flex items-center justify-between gap-2 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[11px] font-extrabold">สรุป</span>
+          <span id="planHeaderTitle" class="font-extrabold text-amber-300 text-xs sm:text-sm">วันที่ 10/11/69 PLAN 1 MC BHS</span>
+          <span class="text-slate-400 text-[11px] hidden sm:inline">| เกณฑ์: กระดาษ M5-M1 ไม่ต่อกัน และ ยาวรวม &lt; <span class="th-val">300</span> เมตร</span>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-slate-300">ผิดปกติ: <strong class="text-rose-400 text-sm font-black" id="anomalyCountBadge">0</strong> ใบ</span>
+          <span class="text-slate-500">/</span>
+          <span class="text-slate-400">ทั้งหมด: <strong class="text-white" id="allOrderCountBadge">0</strong></span>
+        </div>
+      </div>
+
+      <!-- ตารางแบบช่องแคบ (Compact Width & Padding) -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs font-medium">
+          <thead>
+            <tr class="bg-slate-800 text-white text-[11px] font-bold border-b border-slate-700 select-none">
+              <th class="text-center w-10 border-r border-slate-700">ลำดับ</th>
+              <th class="w-32 border-r border-slate-700">PDR / ออเดอร์</th>
+              <th class="border-r border-slate-700">ชื่อลูกค้า</th>
+              <th class="text-center w-10 border-r border-slate-700">ลอน</th>
+              <th class="text-center w-16 border-r border-slate-700">หน้ากว้าง</th>
+              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M5 (หน้า)</th>
+              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M4 (ลอนB)</th>
+              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M3 (กลาง)</th>
+              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M2 (ลอนC)</th>
+              <th class="text-center w-14 bg-slate-900 border-r border-slate-700 text-amber-300">M1 (หลัง)</th>
+              <th class="text-right w-20 bg-rose-950 text-amber-300 border-r border-slate-700">ยาวรวม (ม.)</th>
+              <th class="w-48 text-slate-200">สาเหตุ / ชั้นที่ไม่ต่อกัน</th>
+            </tr>
+          </thead>
+          <tbody id="planTableBody" class="divide-y divide-slate-200">
+            <!-- Render via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- กล่องว่าง -->
+      <div id="emptyBox" class="hidden py-6 text-center text-slate-500 font-bold text-xs">
+        ✅ ไม่พบออเดอร์ที่ผิดปกติตามเกณฑ์นี้
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-3 right-3 z-50 hidden">
+    <div id="toastBox" class="bg-slate-900 text-white px-3 py-1.5 rounded shadow text-xs font-bold flex items-center gap-1.5">
+      <span id="toastText">สำเร็จ</span>
+    </div>
+  </div>
+
+  <script src="sample-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
